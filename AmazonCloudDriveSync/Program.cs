@@ -24,10 +24,10 @@ namespace AmazonCloudDriveSync
         static void Main(string[] args)
         {
             config = new ConfigData();
-            if (File.Exists("amazonCloudDriveSync.ini"))
-                config = JsonConvert.DeserializeObject<ConfigData>(File.ReadAllText("amazonCloudDriveSync.ini"));
+            if (File.Exists(ConfigurationManager.AppSettings["jsonConfig"]))
+                config = JsonConvert.DeserializeObject<ConfigData>(File.ReadAllText(ConfigurationManager.AppSettings["jsonConfig"]));
             updateConfig();
-            File.WriteAllText("amazonCloudDriveSync.ini", JsonConvert.SerializeObject(config));
+            File.WriteAllText(ConfigurationManager.AppSettings["jsonConfig"], JsonConvert.SerializeObject(config));
             Console.WriteLine("We've got a good access token, let's go: {0}", config.lastToken.access_token);
             //Console.WriteLine(JsonConvert.SerializeObject(getFolders(config.rootFolderId), Formatting.Indented));
             Console.ReadKey();
@@ -46,8 +46,43 @@ namespace AmazonCloudDriveSync
                 getMetaDataUrl();
             if (String.IsNullOrWhiteSpace(config.rootFolderId))
                 getRootFolderId();
+            if (String.IsNullOrWhiteSpace(config.cloudMainFolderId) || config.cloudMainFolderId == config.rootFolderId)
+            {
+                var possibleMainFolders = getFoldersByName(ConfigurationManager.AppSettings["cloudFolder"]);
+                if (possibleMainFolders.count > 1) throw new NotImplementedException();
+                if (possibleMainFolders.count == 0)
+                {
+                    createFolder(ConfigurationManager.AppSettings["cloudFolder"], config.rootFolderId);
+                }
+                else if (possibleMainFolders.count == 1)
+                    config.cloudMainFolderId = possibleMainFolders.data[0].id;
+            }
         }
-        private static void getRootFolderId()
+
+        private static void createFolder(string name,string parentId)
+        {
+            HttpClient reqAccessToken = new HttpClient();
+
+            Dictionary<String, Object> reqParams = new Dictionary<String, Object>();
+
+            reqParams.Add("name", name);
+            reqParams.Add("kind", "FOLDER");
+            //reqParams.Add("labels", "");
+            //reqParams.Add("properties", "");
+            var parentList = new List<String>();
+            parentList.Add(parentId);
+            reqParams.Add("parents", parentList);
+            reqAccessToken.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
+            reqAccessToken.BaseAddress = new Uri(config.metaData.metadataUrl);
+            String jsonContent = JsonConvert.SerializeObject(reqParams);
+            StringContent requestContent = new StringContent(jsonContent, UTF8Encoding.UTF8, "application/json");
+            Task<HttpResponseMessage> responseTask = reqAccessToken.PostAsync("nodes", requestContent);
+            HttpResponseMessage response = responseTask.Result;
+            String x = response.Content.ReadAsStringAsync().Result;
+            dynamic p = JsonConvert.DeserializeObject(x);
+            config.cloudMainFolderId = p.id;
+        } 
+        static void getRootFolderId()
         {
             CloudDriveFolder x = getFolders("").data[0];
             String newParent = x.parents[0];
@@ -116,7 +151,7 @@ namespace AmazonCloudDriveSync
             reqAccessToken.BaseAddress = new Uri("https://api.amazon.com/");
 
             HttpContent content = new FormUrlEncodedContent(reqParams);
-            String mycontent = content.ReadAsStringAsync().Result;
+            //String mycontent = content.ReadAsStringAsync().Result;
             Task<HttpResponseMessage> responseTask = reqAccessToken.PostAsync("auth/o2/token", content);
             HttpResponseMessage response = responseTask.Result;
 
@@ -124,7 +159,7 @@ namespace AmazonCloudDriveSync
             return response.Content.ReadAsStringAsync().Result;
             //reqAccessToken.
         }
-        private static String refreshAccessToken(string refresh_token, string key, string secret)
+        private static void refreshAccessToken(string refresh_token, string key, string secret)
         {
             HttpClient reqAccessToken = new HttpClient();
 
@@ -141,7 +176,8 @@ namespace AmazonCloudDriveSync
             String mycontent = content.ReadAsStringAsync().Result;
             Task<HttpResponseMessage> responseTask = reqAccessToken.PostAsync("auth/o2/token", content);
             HttpResponseMessage response = responseTask.Result;
-            return response.Content.ReadAsStringAsync().Result;
+            config.lastToken = JsonConvert.DeserializeObject<AuthTokenResponse>(response.Content.ReadAsStringAsync().Result);
+            config.lastTokenReceived = DateTime.Now;
 
         }
         public static CloudDriveListResponse<CloudDriveFolder> getFolders(String id)
@@ -150,6 +186,14 @@ namespace AmazonCloudDriveSync
             request.BaseAddress = new Uri(config.metaData.metadataUrl);
             request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
             String mycontent = request.GetStringAsync(id.Length>0?"nodes/"+id+"/children?filters=kind:FOLDER":"nodes?filters=kind:FOLDER").Result;
+            return JsonConvert.DeserializeObject<CloudDriveListResponse<CloudDriveFolder>>(mycontent);
+        }
+        public static CloudDriveListResponse<CloudDriveFolder> getFoldersByName(String name)
+        {
+            HttpClient request = new HttpClient();
+            request.BaseAddress = new Uri(config.metaData.metadataUrl);
+            request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
+            String mycontent = request.GetStringAsync("nodes?filters=kind:FOLDER AND name:"+name).Result;
             return JsonConvert.DeserializeObject<CloudDriveListResponse<CloudDriveFolder>>(mycontent);
         }
         public static CloudDriveFolder getFolder(String id)
@@ -205,6 +249,7 @@ namespace AmazonCloudDriveSync
         public DateTime lastTokenReceived { get; set; }
         public String cloudDriveLocalDirectory { get; set; }
         public String rootFolderId { get; set; }
+        public String cloudMainFolderId { get; set; }
         public MetaDataResponse metaData { get; set; }
         public DateTime lastMetaDataCheck { get; set; }
         public ConfigData()
