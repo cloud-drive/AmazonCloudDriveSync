@@ -29,18 +29,31 @@ namespace AmazonCloudDriveSync
             config.updateConfig(() => { File.WriteAllText(ConfigurationManager.AppSettings["jsonConfig"], JsonConvert.SerializeObject(config)); });
             
             Console.WriteLine("We've got a good access token, let's go.");
-            WalkDirectoryTree(new DirectoryInfo(ConfigurationManager.AppSettings["localFolder"]), (s) => { Console.WriteLine(s); });
+            Folder rootFolder = new Folder() {cloudId=config.cloudMainFolderId, localDirectory=new DirectoryInfo(ConfigurationManager.AppSettings["localFolder"])};
+            WalkDirectoryTree(rootFolder, (s, t) => { Console.WriteLine("{0} in {1}:{2}", s, t.cloudId, t.localDirectory.FullName); }, (s) => { Console.WriteLine(s.localDirectory.FullName); });
 
             Console.ReadKey();
         }
-        private static void WalkDirectoryTree(DirectoryInfo root, Action<String> fileOperation)
+        private void updateSingleFile(String localFilename, String cloudParent)
         {
-            Console.WriteLine(root.Name);
+            //check for existing file
+            //if exists in cloud, compare to cloud file.  if same, return
+            //update cloud file
+        }
+        private void makeSureCloudFolderExists(String localFolderName, String cloudParent)
+        {
+            //check for existing folder
+            //if exists in cloud return
+            //create cloud folder
+        }
+        private static void WalkDirectoryTree(Folder root, Action<String, Folder> fileOperation, Action<Folder> folderOperation)
+        {
+            folderOperation(root);
             System.IO.FileInfo[] files = null;
             System.IO.DirectoryInfo[] subDirs = null;
             try
             {
-                files = root.GetFiles("*.*");
+                files = root.localDirectory.GetFiles("*.*");
             }
             catch (UnauthorizedAccessException e)
             {
@@ -53,21 +66,27 @@ namespace AmazonCloudDriveSync
 
             if (files != null)
                 foreach (System.IO.FileInfo fi in files)
-                    fileOperation(fi.FullName);
+                    fileOperation(fi.FullName, root);
 
-            subDirs = root.GetDirectories();
+            subDirs = root.localDirectory.GetDirectories();
             foreach (System.IO.DirectoryInfo dirInfo in subDirs)
-                WalkDirectoryTree(dirInfo, fileOperation);
+                WalkDirectoryTree(new Folder() { cloudId = getCloudSubFolderId(root.cloudId, dirInfo.Name), localDirectory = dirInfo}, fileOperation, folderOperation);
 
         }
-        /*private static string ToQueryString(NameValueCollection nvc)
+
+        private static string getCloudSubFolderId(string parentId, string childName)
         {
-            var array = (from key in nvc.AllKeys
-                         from value in nvc.GetValues(key)
-                         select string.Format("{0}={1}", HttpUtility.UrlEncode(key), HttpUtility.UrlEncode(value)))
-                .ToArray();
-            return "?" + string.Join("&", array);
-        }*/
+            var x = CloudDriveOperations.getChildFolderByName(config, parentId, childName).data;
+            if (x.Count > 0)
+                return x.First().id;
+            return String.Empty;
+        }
+
+        private class Folder
+        {
+           public String cloudId;
+           public DirectoryInfo localDirectory;
+        }
     }
 
 

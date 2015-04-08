@@ -20,6 +20,14 @@ namespace AmazonCloudDriveSync
             String mycontent = request.GetStringAsync(id.Length > 0 ? "nodes/" + id + "/children?filters=kind:FOLDER" : "nodes?filters=kind:FOLDER").Result;
             return JsonConvert.DeserializeObject<CloudDriveListResponse<CloudDriveFolder>>(mycontent);
         }
+        public static CloudDriveListResponse<CloudDriveFolder> getChildFolderByName(ConfigOperations.ConfigData config, String parentId, String name)
+        {
+            HttpClient request = new HttpClient();
+            request.BaseAddress = new Uri(config.metaData.metadataUrl);
+            request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
+            String mycontent = request.GetStringAsync("nodes/" + parentId + "/children?filters=kind:FOLDER AND name:" + name).Result;
+            return JsonConvert.DeserializeObject<CloudDriveListResponse<CloudDriveFolder>>(mycontent);
+        }
         public static CloudDriveListResponse<CloudDriveFolder> getFoldersByName(ConfigOperations.ConfigData config, String name)
         {
             HttpClient request = new HttpClient();
@@ -28,6 +36,8 @@ namespace AmazonCloudDriveSync
             String mycontent = request.GetStringAsync("nodes?filters=kind:FOLDER AND name:" + name).Result;
             return JsonConvert.DeserializeObject<CloudDriveListResponse<CloudDriveFolder>>(mycontent);
         }
+
+
         public static CloudDriveFolder getFolder(ConfigOperations.ConfigData config, String id)
         {
             HttpClient request = new HttpClient();
