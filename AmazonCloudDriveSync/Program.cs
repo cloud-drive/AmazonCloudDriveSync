@@ -26,14 +26,15 @@ namespace AmazonCloudDriveSync
             config = new ConfigData();
             if (File.Exists(ConfigurationManager.AppSettings["jsonConfig"]))
                 config = JsonConvert.DeserializeObject<ConfigData>(File.ReadAllText(ConfigurationManager.AppSettings["jsonConfig"]));
-            updateConfig();
-            File.WriteAllText(ConfigurationManager.AppSettings["jsonConfig"], JsonConvert.SerializeObject(config));
-            Console.WriteLine("We've got a good access token, let's go: {0}", config.lastToken.access_token);
-            //Console.WriteLine(JsonConvert.SerializeObject(getFolders(config.rootFolderId), Formatting.Indented));
+            updateConfig(() => { File.WriteAllText(ConfigurationManager.AppSettings["jsonConfig"], JsonConvert.SerializeObject(config)); });
+            
+            Console.WriteLine("We've got a good access token, let's go.");
+            WalkDirectoryTree(new DirectoryInfo(ConfigurationManager.AppSettings["localFolder"]), (s) => { Console.WriteLine(s); });
+
             Console.ReadKey();
         }
 
-        private static void updateConfig()
+        private static void updateConfig(Action saveConfig)
         {
             if (config.lastTokenReceived.AddSeconds(config.lastToken.expires_in) < DateTime.Now)
                 if (String.IsNullOrWhiteSpace(config.lastToken.access_token))
@@ -42,10 +43,13 @@ namespace AmazonCloudDriveSync
                     refreshAccessToken(config.lastToken.refresh_token, ConfigurationManager.AppSettings["appKey"], ConfigurationManager.AppSettings["appSecret"]);
             if (String.IsNullOrWhiteSpace(config.lastToken.access_token) && (config.lastTokenReceived.AddSeconds(config.lastToken.expires_in) < DateTime.Now))
                 getBrandNewToken();
+            saveConfig();
+
             if (config.lastMetaDataCheck.AddDays(3) < DateTime.Now)
                 getMetaDataUrl();
             if (String.IsNullOrWhiteSpace(config.rootFolderId))
                 getRootFolderId();
+
             if (String.IsNullOrWhiteSpace(config.cloudMainFolderId) || config.cloudMainFolderId == config.rootFolderId)
             {
                 var possibleMainFolders = getFoldersByName(ConfigurationManager.AppSettings["cloudFolder"]);
@@ -57,8 +61,36 @@ namespace AmazonCloudDriveSync
                 else if (possibleMainFolders.count == 1)
                     config.cloudMainFolderId = possibleMainFolders.data[0].id;
             }
-        }
+            saveConfig();
 
+        }
+        private static void WalkDirectoryTree(DirectoryInfo root, Action<String> fileOperation)
+        {
+            Console.WriteLine(root.Name);
+            System.IO.FileInfo[] files = null;
+            System.IO.DirectoryInfo[] subDirs = null;
+            try
+            {
+                files = root.GetFiles("*.*");
+            }
+            catch (UnauthorizedAccessException e)
+            {
+                Console.WriteLine(e.Message);
+            }
+            catch (System.IO.DirectoryNotFoundException e)
+            {
+                Console.WriteLine(e.Message);
+            }
+
+            if (files != null)
+                foreach (System.IO.FileInfo fi in files)
+                    fileOperation(fi.FullName);
+
+            subDirs = root.GetDirectories();
+            foreach (System.IO.DirectoryInfo dirInfo in subDirs)
+                WalkDirectoryTree(dirInfo, fileOperation);
+
+        }
         private static void createFolder(string name,string parentId)
         {
             HttpClient reqAccessToken = new HttpClient();
@@ -82,7 +114,7 @@ namespace AmazonCloudDriveSync
             dynamic p = JsonConvert.DeserializeObject(x);
             config.cloudMainFolderId = p.id;
         } 
-        static void getRootFolderId()
+        private static void getRootFolderId()
         {
             CloudDriveFolder x = getFolders("").data[0];
             String newParent = x.parents[0];
