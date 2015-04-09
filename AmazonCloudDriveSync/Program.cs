@@ -30,7 +30,7 @@ namespace AmazonCloudDriveSync
             
             Console.WriteLine("We've got a good access token, let's go.");
             Folder rootFolder = new Folder() {cloudId=config.cloudMainFolderId, localDirectory=new DirectoryInfo(ConfigurationManager.AppSettings["localFolder"])};
-            WalkDirectoryTree(rootFolder, (s, t) => { Console.WriteLine("{0} in {1}:{2}", s, t.cloudId, t.localDirectory.FullName); }, (s) => { Console.WriteLine(s.localDirectory.FullName); });
+            WalkDirectoryTree(rootFolder, (s, t) => { Console.WriteLine("{0} in {1}:{2}", s, t.cloudId, t.localDirectory.FullName); }, (s) => { makeSureCloudFolderExists(s); Console.WriteLine(s.localDirectory.FullName); });
 
             Console.ReadKey();
         }
@@ -40,7 +40,7 @@ namespace AmazonCloudDriveSync
             //if exists in cloud, compare to cloud file.  if same, return
             //update cloud file
         }
-        private void makeSureCloudFolderExists(String localFolderName, String cloudParent)
+        private static void makeSureCloudFolderExists(Folder myFolder)
         {
             //check for existing folder
             //if exists in cloud return
@@ -77,11 +77,11 @@ namespace AmazonCloudDriveSync
         private static string getCloudSubFolderId(string parentId, string childName)
         {
             var x = CloudDriveOperations.getChildFolderByName(config, parentId, childName).data;
+            if (x == null) return String.Empty;
             if (x.Count > 0)
                 return x.First().id;
             return String.Empty;
         }
-
         private class Folder
         {
            public String cloudId;

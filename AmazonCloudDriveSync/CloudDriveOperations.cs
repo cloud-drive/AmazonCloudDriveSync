@@ -22,6 +22,7 @@ namespace AmazonCloudDriveSync
         }
         public static CloudDriveListResponse<CloudDriveFolder> getChildFolderByName(ConfigOperations.ConfigData config, String parentId, String name)
         {
+            if (String.IsNullOrWhiteSpace(parentId) || String.IsNullOrWhiteSpace(name)) return new CloudDriveListResponse<CloudDriveFolder>();
             HttpClient request = new HttpClient();
             request.BaseAddress = new Uri(config.metaData.metadataUrl);
             request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
