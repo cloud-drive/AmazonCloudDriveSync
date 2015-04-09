@@ -47,7 +47,7 @@ namespace AmazonCloudDriveSync
             String mycontent = request.GetStringAsync("nodes/" + id).Result;
             return JsonConvert.DeserializeObject<CloudDriveFolder>(mycontent);
         }
-        public static void createFolder(ConfigOperations.ConfigData config, string name, string parentId)
+        public static String createFolder(ConfigOperations.ConfigData config, string name, string parentId)
         {
             HttpClient reqAccessToken = new HttpClient();
 
@@ -68,7 +68,7 @@ namespace AmazonCloudDriveSync
             HttpResponseMessage response = responseTask.Result;
             String x = response.Content.ReadAsStringAsync().Result;
             dynamic p = JsonConvert.DeserializeObject(x);
-            config.cloudMainFolderId = p.id;
+            return p.id;
         }
         public class CloudDriveNode
         {

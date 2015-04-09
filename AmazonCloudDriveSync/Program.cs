@@ -70,16 +70,17 @@ namespace AmazonCloudDriveSync
 
             subDirs = root.localDirectory.GetDirectories();
             foreach (System.IO.DirectoryInfo dirInfo in subDirs)
-                WalkDirectoryTree(new Folder() { cloudId = getCloudSubFolderId(root.cloudId, dirInfo.Name), localDirectory = dirInfo}, fileOperation, folderOperation);
+                WalkDirectoryTree(new Folder() { cloudId = getOrCreateCloudSubFolderId(root.cloudId, dirInfo.Name), localDirectory = dirInfo}, fileOperation, folderOperation);
 
         }
 
-        private static string getCloudSubFolderId(string parentId, string childName)
+        private static string getOrCreateCloudSubFolderId(string parentId, string childName)
         {
-            var x = CloudDriveOperations.getChildFolderByName(config, parentId, childName).data;
-            if (x == null) return String.Empty;
-            if (x.Count > 0)
-                return x.First().id;
+            var folderSearch = CloudDriveOperations.getChildFolderByName(config, parentId, childName).data;
+            if (folderSearch == null || folderSearch.Count==0)
+                return CloudDriveOperations.createFolder(config, childName, parentId);
+            if (folderSearch.Count > 0)
+                return folderSearch.First().id;
             return String.Empty;
         }
         private class Folder
