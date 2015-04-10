@@ -46,7 +46,7 @@ namespace AmazonCloudDriveSync
                     //create the file
                     break;
                 case (1):
-                    //update the file if necessary
+                    //update the file if necessary, compare MD5 hash
                     break;
                 default:
                     //we have more than one result

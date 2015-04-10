@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using JPT;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,6 +8,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace AmazonCloudDriveSync
@@ -81,11 +83,21 @@ namespace AmazonCloudDriveSync
                 MultipartFormDataContent form = new MultipartFormDataContent();
                 form.Add(new StringContent(myMetaData), "metadata");
 
-                var fileStreamContent = new StreamContent(file);
+                Download myDownload = new Download();
+                var fileStreamContent = new ProgressableStreamContent(file, 8096, myDownload);
                 fileStreamContent.Headers.ContentType = new MediaTypeHeaderValue(MimeTypeMap.MimeTypeMap.GetMimeType(Path.GetExtension(fullFilePath)));
                 form.Add(fileStreamContent, "content", Path.GetFileName(fullFilePath));
 
-                HttpResponseMessage result = request.PostAsync("nodes", form).Result;
+                var postAsync = request.PostAsync("nodes", form);
+                //postAsync.Start();
+                TextProgressBar myBar = new TextProgressBar(file.Length,(-1),true);
+
+                while (!postAsync.IsCompleted)
+                {
+                    myBar.Update(myDownload.Uploaded);
+                    Thread.Sleep(1000);
+                }
+                HttpResponseMessage result = postAsync.Result;
                 if (result.StatusCode == HttpStatusCode.Conflict)
                     //Conflict!
                     return String.Empty;
