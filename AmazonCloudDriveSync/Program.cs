@@ -24,6 +24,7 @@ namespace AmazonCloudDriveSync
         public static ConfigOperations.ConfigData config;
         static void Main(string[] args)
         {
+            Console.WriteLine("Press a key to begin");  Console.ReadKey();
             config = new ConfigOperations.ConfigData();
             if (File.Exists(ConfigurationManager.AppSettings["jsonConfig"]))
                 config = JsonConvert.DeserializeObject<ConfigOperations.ConfigData>(File.ReadAllText(ConfigurationManager.AppSettings["jsonConfig"]));

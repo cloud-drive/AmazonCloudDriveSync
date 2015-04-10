@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -66,37 +67,34 @@ namespace AmazonCloudDriveSync
         }
         public static String uploadFile(ConfigOperations.ConfigData config, string fullFilePath, string parentId)
         {
-            JsonSerializer _jsonWriter = new JsonSerializer
-            {
-                NullValueHandling = NullValueHandling.Ignore
-            };
-
             HttpClient request = new HttpClient();
             request.BaseAddress = new Uri(config.metaData.contentUrl);
             request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
-            MultipartFormDataContent form = new MultipartFormDataContent();
+
             var parentList = new List<String>();
             parentList.Add(parentId);
-            List<KeyValuePair<string, string>> newFileProperties = new List<KeyValuePair<string, string>>();
-            newFileProperties.Add(new KeyValuePair<string, string>("cloudDriveSyncMD5", "xxx123"));
-            //CloudDriveNodeRequest addNode = new CloudDriveNodeRequest() { name = Path.GetFileName(fullFilePath), parents = parentList, kind = "FILE", properties = newFileProperties };
-            //FormUrlEncodedContent x = new FormUrlEncodedContent(new Dictionary<string,string>() {{"name",fullFilePath},{ "parents",JsonConvert.SerializeObject(parentList)}, {"kind","FILE"}, {"properties",JsonConvert.SerializeObject(newFileProperties)}});
-            Dictionary<string, Object> addNode = new Dictionary<string, Object>() { { "name", Path.GetFileName(fullFilePath) }, { "kind", "FILE" } };
+
+            Dictionary<string, Object> addNode = new Dictionary<string, Object>() { { "name", Path.GetFileName(fullFilePath) }, { "kind", "FILE" }, {"parents",parentList} };
+            String myMetaData = JsonConvert.SerializeObject(addNode, Newtonsoft.Json.Formatting.None, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore, });
             using (FileStream file = File.Open(fullFilePath, FileMode.Open, FileAccess.Read))
             {
-                form.Add(new StringContent(JsonConvert.SerializeObject(addNode, Newtonsoft.Json.Formatting.None, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore, })), "metadata");
-                //form.Add(x, "metadata");
-                form.Add(new StreamContent(file), "content");
-                var result = request.PostAsync("nodes?localId=testfile1", form).Result;
-                return result.ToString();
+                MultipartFormDataContent form = new MultipartFormDataContent();
+                form.Add(new StringContent(myMetaData), "metadata");
+
+                var fileStreamContent = new StreamContent(file);
+                fileStreamContent.Headers.ContentType = new MediaTypeHeaderValue(MimeTypeMap.MimeTypeMap.GetMimeType(Path.GetExtension(fullFilePath)));
+                form.Add(fileStreamContent, "content", Path.GetFileName(fullFilePath));
+
+                HttpResponseMessage result = request.PostAsync("nodes", form).Result;
+                if (result.StatusCode == HttpStatusCode.Conflict)
+                    //Conflict!
+                    return String.Empty;
+                if (result.StatusCode == HttpStatusCode.Created)
+                    return JsonConvert.DeserializeObject<CloudDriveNode>(result.Content.ReadAsStringAsync().Result).id;
+                return String.Empty;
             }
-            
-            
-
-            //dynamic t = JsonConvert.DeserializeObject(result);
-            
-
         }
+
         public static String createFolder(ConfigOperations.ConfigData config, string name, string parentId)
         {
             HttpClient reqAccessToken = new HttpClient();
@@ -125,21 +123,38 @@ namespace AmazonCloudDriveSync
             public string name;
             public string kind;
             public List<string> parents;
-            //public List<string> labels;
+            public List<string> labels;
             public List<KeyValuePair<string, string>> properties;
-            //public string createdBy;
+            public string createdBy;
 
             public CloudDriveNodeRequest()
             {
                 parents = new List<string>();
-                //labels = new List<string>();
+                labels = new List<string>();
                 properties = new List<KeyValuePair<string, string>>();
             }
+        }
+        public class ContentProperties
+        {
+            public UInt64 size;
+            public int version;
+            public String contentType;
+            public string extension;
+            public string md5;
         }
         public class CloudDriveNode :CloudDriveNodeRequest
         {
             public string id;
+            public string version;
+            public DateTime modifiedDate;
+            public DateTime createdDate;
+            public string status;
+            public ContentProperties contentProperties;
 
+            public CloudDriveNode()
+            {
+                contentProperties = new ContentProperties();
+            }
         }
         public class CloudDriveFolder : CloudDriveNode
         {
