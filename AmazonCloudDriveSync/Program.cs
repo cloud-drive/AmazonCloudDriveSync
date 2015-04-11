@@ -32,13 +32,20 @@ namespace AmazonCloudDriveSync
             
             Console.WriteLine("We've got a good access token, let's go.");
             Folder rootFolder = new Folder() {cloudId=config.cloudMainFolderId, localDirectory=new DirectoryInfo(ConfigurationManager.AppSettings["localFolder"])};
-            WalkDirectoryTree(rootFolder, (s, t) => { Console.WriteLine("{0} in {1}:{2}", s, t.cloudId, t.localDirectory.FullName); updateSingleFile(s, t); }, (s) => { Console.WriteLine(s.localDirectory.FullName); });
+            WalkDirectoryTree(rootFolder, 
+                (filename, parentFolder) => { 
+                    Console.WriteLine("{0} in {1}:{2}", filename, parentFolder.cloudId, parentFolder.localDirectory.FullName); 
+                    updateSingleFile(filename, parentFolder); 
+                }, 
+                (folderName) => { 
+                    Console.WriteLine(folderName.localDirectory.FullName); 
+                });
 
             Console.ReadKey();
         }
         private static void updateSingleFile(String localFilename, Folder cloudParent)
         {
-            CloudDriveOperations.CloudDriveListResponse<CloudDriveOperations.CloudDriveFile> fileSearch = CloudDriveOperations.getFileByNameAndParentId(config, cloudParent.cloudId, Path.GetFileName(localFilename));
+            CloudDriveOperations.CloudDriveListResponse<CloudDriveOperations.CloudDriveFile> fileSearch = CloudDriveOperations.getFileByNameAndMd5(config, Path.GetFileName(localFilename), getMD5hash(localFilename));
             switch (fileSearch.count)
             {
                 case (0):
@@ -46,6 +53,12 @@ namespace AmazonCloudDriveSync
                     //create the file
                     break;
                 case (1):
+                    Console.WriteLine("Cloud already knows file: {0}", localFilename);
+                    if (fileSearch.data[0].parents.Contains(cloudParent.cloudId))
+                        Console.WriteLine("Cloud already has this file under the correct parent");
+                    else
+                        Console.WriteLine("**** >>>> Cloud needs to add this file under the correct parent");
+
                     //update the file if necessary, compare MD5 hash
                     break;
                 default:
@@ -94,7 +107,14 @@ namespace AmazonCloudDriveSync
         {
             using (var md5 = MD5.Create())
             using (var stream = File.OpenRead(filename))
-                return Encoding.UTF8.GetString( md5.ComputeHash(stream));
+            {
+                byte[] data = md5.ComputeHash(stream);
+                StringBuilder sBuilder = new StringBuilder();
+                for (int i = 0; i < data.Length; i++)
+                    sBuilder.Append(data[i].ToString("x2"));
+                return sBuilder.ToString();
+            }
+
         }
         private class Folder
         {

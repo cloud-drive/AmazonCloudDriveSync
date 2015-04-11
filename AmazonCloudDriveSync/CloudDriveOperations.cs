@@ -56,7 +56,15 @@ namespace AmazonCloudDriveSync
             HttpClient request = new HttpClient();
             request.BaseAddress = new Uri(config.metaData.metadataUrl);
             request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
-            String mycontent = request.GetStringAsync("nodes/" + parentId + "/children?filters=kind:FILE").Result;
+            String mycontent = request.GetStringAsync("nodes/" + parentId + "/children?filters=kind:FILE AND name:" + name).Result;
+            return JsonConvert.DeserializeObject<CloudDriveListResponse<CloudDriveFile>>(mycontent);
+        }
+        public static CloudDriveListResponse<CloudDriveFile> getFileByNameAndMd5(ConfigOperations.ConfigData config, String name, String md5)
+        {
+            HttpClient request = new HttpClient();
+            request.BaseAddress = new Uri(config.metaData.metadataUrl);
+            request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
+            String mycontent = request.GetStringAsync("nodes?filters=kind:FILE AND name:'"+ name +"' AND contentProperties.md5:"+md5).Result;
             return JsonConvert.DeserializeObject<CloudDriveListResponse<CloudDriveFile>>(mycontent);
         }
         public static CloudDriveFile getFileById(ConfigOperations.ConfigData config, String id)
@@ -97,10 +105,14 @@ namespace AmazonCloudDriveSync
                     myBar.Update(myDownload.Uploaded);
                     Thread.Sleep(1000);
                 }
+                myBar.Update(myDownload.Uploaded);
                 HttpResponseMessage result = postAsync.Result;
                 if (result.StatusCode == HttpStatusCode.Conflict)
-                    //Conflict!
+                {
+                    String errorMessage = result.Content.ReadAsStringAsync().Result;
+
                     return String.Empty;
+                }
                 if (result.StatusCode == HttpStatusCode.Created)
                     return JsonConvert.DeserializeObject<CloudDriveNode>(result.Content.ReadAsStringAsync().Result).id;
                 return String.Empty;
