@@ -1,4 +1,5 @@
-﻿using JPT;
+﻿using AmazonCloudDriveSync.CloudDriveModels;
+using JPT;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -11,71 +12,66 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
+
 namespace AmazonCloudDriveSync
 {
     public static class CloudDriveOperations
     {
-
-        public static CloudDriveListResponse<CloudDriveFolder> getFolders(ConfigOperations.ConfigData config, String id)
+        public static CloudDriveListResponse<T> listSearch<T>(ConfigOperations.ConfigData config, String command)
         {
             HttpClient request = new HttpClient();
             request.BaseAddress = new Uri(config.metaData.metadataUrl);
             request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
-            String mycontent = request.GetStringAsync(id.Length > 0 ? "nodes/" + id + "/children?filters=kind:FOLDER" : "nodes?filters=kind:FOLDER").Result;
-            return JsonConvert.DeserializeObject<CloudDriveListResponse<CloudDriveFolder>>(mycontent);
+            String mycontent = request.GetStringAsync(command).Result;
+            return JsonConvert.DeserializeObject<CloudDriveListResponse<T>>(mycontent);
+        }
+        public static T nodeSearch<T>(ConfigOperations.ConfigData config, String command)
+        {
+            HttpClient request = new HttpClient();
+            request.BaseAddress = new Uri(config.metaData.metadataUrl);
+            request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
+            String mycontent = request.GetStringAsync(command).Result;
+            return JsonConvert.DeserializeObject<T>(mycontent);
+        }
+
+        public static CloudDriveListResponse<CloudDriveFolder> getFolders(ConfigOperations.ConfigData config, String id)
+        {
+            return listSearch<CloudDriveFolder>(config, id.Length > 0 ? "nodes/" + id + "/children?filters=kind:FOLDER" : "nodes?filters=kind:FOLDER");
         }
         public static CloudDriveListResponse<CloudDriveFolder> getChildFolderByName(ConfigOperations.ConfigData config, String parentId, String name)
         {
             if (String.IsNullOrWhiteSpace(parentId) || String.IsNullOrWhiteSpace(name)) return new CloudDriveListResponse<CloudDriveFolder>();
-            HttpClient request = new HttpClient();
-            request.BaseAddress = new Uri(config.metaData.metadataUrl);
-            request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
-            String mycontent = request.GetStringAsync("nodes/" + parentId + "/children?filters=kind:FOLDER AND name:" + name).Result;
-            return JsonConvert.DeserializeObject<CloudDriveListResponse<CloudDriveFolder>>(mycontent);
+            return listSearch<CloudDriveFolder>(config, "nodes/" + parentId + "/children?filters=kind:FOLDER AND name:" + name);
         }
         public static CloudDriveListResponse<CloudDriveFolder> getFoldersByName(ConfigOperations.ConfigData config, String name)
         {
-            HttpClient request = new HttpClient();
-            request.BaseAddress = new Uri(config.metaData.metadataUrl);
-            request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
-            String mycontent = request.GetStringAsync("nodes?filters=kind:FOLDER AND name:" + name).Result;
-            return JsonConvert.DeserializeObject<CloudDriveListResponse<CloudDriveFolder>>(mycontent);
+            return listSearch<CloudDriveFolder>(config, "nodes?filters=kind:FOLDER AND name:" + name);
         }
-
 
         public static CloudDriveFolder getFolder(ConfigOperations.ConfigData config, String id)
         {
-            HttpClient request = new HttpClient();
-            request.BaseAddress = new Uri(config.metaData.metadataUrl);
-            request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
-            String mycontent = request.GetStringAsync("nodes/" + id).Result;
-            return JsonConvert.DeserializeObject<CloudDriveFolder>(mycontent);
+            return nodeSearch<CloudDriveFolder>(config, "nodes/" + id);
         }
         public static CloudDriveListResponse<CloudDriveFile> getFileByNameAndParentId(ConfigOperations.ConfigData config, String parentId, String name)
         {
-            HttpClient request = new HttpClient();
-            request.BaseAddress = new Uri(config.metaData.metadataUrl);
-            request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
-            String mycontent = request.GetStringAsync("nodes/" + parentId + "/children?filters=kind:FILE AND name:" + name).Result;
-            return JsonConvert.DeserializeObject<CloudDriveListResponse<CloudDriveFile>>(mycontent);
+            return listSearch<CloudDriveFile>(config, "nodes/" + parentId + "/children?filters=kind:FILE AND name:" + name);
+        }
+        public static CloudDriveListResponse<CloudDriveFile> getFilesByName(ConfigOperations.ConfigData config, String name)
+        {
+            return listSearch<CloudDriveFile>(config, "nodes?filters=kind:FILE AND name:'" + name);
         }
         public static CloudDriveListResponse<CloudDriveFile> getFileByNameAndMd5(ConfigOperations.ConfigData config, String name, String md5)
         {
-            HttpClient request = new HttpClient();
-            request.BaseAddress = new Uri(config.metaData.metadataUrl);
-            request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
-            String mycontent = request.GetStringAsync("nodes?filters=kind:FILE AND name:'"+ name +"' AND contentProperties.md5:"+md5).Result;
-            return JsonConvert.DeserializeObject<CloudDriveListResponse<CloudDriveFile>>(mycontent);
+            return listSearch<CloudDriveFile>(config, "nodes?filters=kind:FILE AND name:'" + name + "' AND contentProperties.md5:" + md5);
         }
-        public static CloudDriveFile getFileById(ConfigOperations.ConfigData config, String id)
+        public static CloudDriveFile getFile(ConfigOperations.ConfigData config, String id)
         {
-            HttpClient request = new HttpClient();
-            request.BaseAddress = new Uri(config.metaData.metadataUrl);
-            request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
-            String mycontent = request.GetStringAsync("nodes/" + id).Result;
-            return JsonConvert.DeserializeObject<CloudDriveFile>(mycontent);
+            return nodeSearch<CloudDriveFile>(config, "nodes/" + id);
         }
+
         public static String uploadFile(ConfigOperations.ConfigData config, string fullFilePath, string parentId)
+        {   return uploadFile(config, fullFilePath, parentId, false); }
+        public static String uploadFile(ConfigOperations.ConfigData config, string fullFilePath, string parentId, Boolean force)
         {
             HttpClient request = new HttpClient();
             request.BaseAddress = new Uri(config.metaData.contentUrl);
@@ -142,59 +138,17 @@ namespace AmazonCloudDriveSync
             dynamic p = JsonConvert.DeserializeObject(x);
             return p.id;
         }
-        public class CloudDriveNodeRequest
-        {            
-            public string name;
-            public string kind;
-            public List<string> parents;
-            public List<string> labels;
-            public List<KeyValuePair<string, string>> properties;
-            public string createdBy;
 
-            public CloudDriveNodeRequest()
-            {
-                parents = new List<string>();
-                labels = new List<string>();
-                properties = new List<KeyValuePair<string, string>>();
-            }
-        }
-        public class ContentProperties
+
+
+        internal static void addNodeParent(ConfigOperations.ConfigData config, string p1, string p2)
         {
-            public UInt64 size;
-            public int version;
-            public String contentType;
-            public string extension;
-            public string md5;
+            throw new NotImplementedException();
         }
-        public class CloudDriveNode :CloudDriveNodeRequest
+
+        internal static void uploadFileContent(ConfigOperations.ConfigData config, string localFilename, string p)
         {
-            public string id;
-            public string version;
-            public DateTime modifiedDate;
-            public DateTime createdDate;
-            public string status;
-            public ContentProperties contentProperties;
-
-            public CloudDriveNode()
-            {
-                contentProperties = new ContentProperties();
-            }
+            throw new NotImplementedException();
         }
-        public class CloudDriveFolder : CloudDriveNode
-        {
-
-        }
-        public class CloudDriveFile : CloudDriveNode
-        {
-
-        }
-        public class CloudDriveListResponse<T>
-        {
-            public Int32 count;
-            public String nextToken;
-            public List<T> data;
-        }
-
-
     }
 }
