@@ -10,6 +10,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,6 +24,7 @@ namespace AmazonCloudDriveSync
         public static ConfigOperations.ConfigData config;
         static void Main(string[] args)
         {
+            Console.WriteLine("Press a key to begin");  Console.ReadKey();
             config = new ConfigOperations.ConfigData();
             if (File.Exists(ConfigurationManager.AppSettings["jsonConfig"]))
                 config = JsonConvert.DeserializeObject<ConfigOperations.ConfigData>(File.ReadAllText(ConfigurationManager.AppSettings["jsonConfig"]));
@@ -30,21 +32,26 @@ namespace AmazonCloudDriveSync
             
             Console.WriteLine("We've got a good access token, let's go.");
             Folder rootFolder = new Folder() {cloudId=config.cloudMainFolderId, localDirectory=new DirectoryInfo(ConfigurationManager.AppSettings["localFolder"])};
-            WalkDirectoryTree(rootFolder, (s, t) => { Console.WriteLine("{0} in {1}:{2}", s, t.cloudId, t.localDirectory.FullName); }, (s) => { makeSureCloudFolderExists(s); Console.WriteLine(s.localDirectory.FullName); });
+            WalkDirectoryTree(rootFolder, (s, t) => { Console.WriteLine("{0} in {1}:{2}", s, t.cloudId, t.localDirectory.FullName); updateSingleFile(s, t); }, (s) => { Console.WriteLine(s.localDirectory.FullName); });
 
             Console.ReadKey();
         }
-        private void updateSingleFile(String localFilename, String cloudParent)
+        private static void updateSingleFile(String localFilename, Folder cloudParent)
         {
-            //check for existing file
-            //if exists in cloud, compare to cloud file.  if same, return
-            //update cloud file
-        }
-        private static void makeSureCloudFolderExists(Folder myFolder)
-        {
-            //check for existing folder
-            //if exists in cloud return
-            //create cloud folder
+            CloudDriveOperations.CloudDriveListResponse<CloudDriveOperations.CloudDriveFile> fileSearch = CloudDriveOperations.getFileByNameAndParentId(config, cloudParent.cloudId, Path.GetFileName(localFilename));
+            switch (fileSearch.count)
+            {
+                case (0):
+                    CloudDriveOperations.uploadFile(config, localFilename, cloudParent.cloudId);
+                    //create the file
+                    break;
+                case (1):
+                    //update the file if necessary, compare MD5 hash
+                    break;
+                default:
+                    //we have more than one result
+                    break;
+            }
         }
         private static void WalkDirectoryTree(Folder root, Action<String, Folder> fileOperation, Action<Folder> folderOperation)
         {
@@ -70,17 +77,24 @@ namespace AmazonCloudDriveSync
 
             subDirs = root.localDirectory.GetDirectories();
             foreach (System.IO.DirectoryInfo dirInfo in subDirs)
-                WalkDirectoryTree(new Folder() { cloudId = getCloudSubFolderId(root.cloudId, dirInfo.Name), localDirectory = dirInfo}, fileOperation, folderOperation);
+                WalkDirectoryTree(new Folder() { cloudId = getOrCreateCloudSubFolderId(root.cloudId, dirInfo.Name), localDirectory = dirInfo}, fileOperation, folderOperation);
 
         }
 
-        private static string getCloudSubFolderId(string parentId, string childName)
+        private static string getOrCreateCloudSubFolderId(string parentId, string childName)
         {
-            var x = CloudDriveOperations.getChildFolderByName(config, parentId, childName).data;
-            if (x == null) return String.Empty;
-            if (x.Count > 0)
-                return x.First().id;
+            var folderSearch = CloudDriveOperations.getChildFolderByName(config, parentId, childName).data;
+            if (folderSearch == null || folderSearch.Count==0)
+                return CloudDriveOperations.createFolder(config, childName, parentId);
+            if (folderSearch.Count > 0)
+                return folderSearch.First().id;
             return String.Empty;
+        }
+        private static string getMD5hash(string filename)
+        {
+            using (var md5 = MD5.Create())
+            using (var stream = File.OpenRead(filename))
+                return Encoding.UTF8.GetString( md5.ComputeHash(stream));
         }
         private class Folder
         {

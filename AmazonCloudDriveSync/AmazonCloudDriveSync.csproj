@@ -83,8 +83,11 @@
   <ItemGroup>
     <Compile Include="CloudDriveOperations.cs" />
     <Compile Include="ConfigOperations.cs" />
+    <Compile Include="MimeTypeMap.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="ProgressableStreamContent.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="TextProgressBar.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config">

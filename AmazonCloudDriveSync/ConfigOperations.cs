@@ -51,7 +51,8 @@ namespace AmazonCloudDriveSync
                     if (possibleMainFolders.count > 1) throw new NotImplementedException();
                     if (possibleMainFolders.count == 0)
                     {
-                        CloudDriveOperations.createFolder(this, ConfigurationManager.AppSettings["cloudFolder"], this.rootFolderId);
+                        this.cloudMainFolderId = CloudDriveOperations.createFolder(this, ConfigurationManager.AppSettings["cloudFolder"], this.rootFolderId);
+                        
                     }
                     else if (possibleMainFolders.count == 1)
                         this.cloudMainFolderId = possibleMainFolders.data[0].id;
