@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 //taken from http://stackoverflow.com/questions/22528839/how-can-i-calculate-progress-with-httpclient-postasync
 
-namespace AmazonCloudDriveSync
+namespace CloudDriveLayer
 {
     public class ProgressableStreamContent : HttpContent
     {

@@ -1,4 +1,4 @@
-﻿using AmazonCloudDriveSync.CloudDriveModels;
+﻿using CloudDriveLayer.CloudDriveModels;
 using JPT;
 using Newtonsoft.Json;
 using System;
@@ -13,7 +13,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 
-namespace AmazonCloudDriveSync
+namespace CloudDriveLayer
 {
     public static class CloudDriveOperations
     {
@@ -93,20 +93,18 @@ namespace AmazonCloudDriveSync
                 form.Add(fileStreamContent, "content", Path.GetFileName(fullFilePath));
 
                 var postAsync = request.PostAsync("nodes", form);
-                //postAsync.Start();
                 TextProgressBar myBar = new TextProgressBar(file.Length,(-1),true);
-
                 while (!postAsync.IsCompleted)
                 {
                     myBar.Update(myDownload.Uploaded);
                     Thread.Sleep(1000);
                 }
                 myBar.Update(myDownload.Uploaded);
+
                 HttpResponseMessage result = postAsync.Result;
                 if (result.StatusCode == HttpStatusCode.Conflict)
                 {
                     String errorMessage = result.Content.ReadAsStringAsync().Result;
-
                     return String.Empty;
                 }
                 if (result.StatusCode == HttpStatusCode.Created)
@@ -140,13 +138,12 @@ namespace AmazonCloudDriveSync
         }
 
 
-
-        internal static void addNodeParent(ConfigOperations.ConfigData config, string p1, string p2)
+        public static void addNodeParent(ConfigOperations.ConfigData config, string p1, string p2)
         {
             throw new NotImplementedException();
         }
 
-        internal static void uploadFileContent(ConfigOperations.ConfigData config, string localFilename, string p)
+        public static void uploadFileContent(ConfigOperations.ConfigData config, string localFilename, string p)
         {
             throw new NotImplementedException();
         }

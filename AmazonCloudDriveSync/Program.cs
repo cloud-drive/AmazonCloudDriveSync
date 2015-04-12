@@ -1,4 +1,6 @@
-﻿using AmazonCloudDriveSync.CloudDriveModels;
+﻿using CloudDriveLayer;
+using CloudDriveLayer.CloudDriveModels;
+using CloudDriveLayer.ConfigOperations;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -22,13 +24,19 @@ namespace AmazonCloudDriveSync
 {
     class Program
     {
-        public static ConfigOperations.ConfigData config;
+        public static ConfigData config;
         static void Main(string[] args)
         {
             Console.WriteLine("Press a key to begin");  Console.ReadKey();
-            config = new ConfigOperations.ConfigData();
+            config = new ConfigData(
+                ConfigurationManager.AppSettings["appKey"], 
+                ConfigurationManager.AppSettings["appSecret"], 
+                ConfigurationManager.AppSettings["cloudFolder"],
+                ConfigurationManager.AppSettings["oauthxRedirect"],
+                ConfigurationManager.AppSettings["oauthxBase"]
+                );
             if (File.Exists(ConfigurationManager.AppSettings["jsonConfig"]))
-                config = JsonConvert.DeserializeObject<ConfigOperations.ConfigData>(File.ReadAllText(ConfigurationManager.AppSettings["jsonConfig"]));
+                config = JsonConvert.DeserializeObject<ConfigData>(File.ReadAllText(ConfigurationManager.AppSettings["jsonConfig"]));
             config.updateConfig(() => { File.WriteAllText(ConfigurationManager.AppSettings["jsonConfig"], JsonConvert.SerializeObject(config)); });
             
             Console.WriteLine("We've got a good access token, let's go.");

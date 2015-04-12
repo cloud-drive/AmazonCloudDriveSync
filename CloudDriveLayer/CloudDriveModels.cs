@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AmazonCloudDriveSync.CloudDriveModels
+namespace CloudDriveLayer.CloudDriveModels
 {
 
         public class CloudDriveNodeRequest
