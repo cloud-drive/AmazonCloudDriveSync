@@ -33,6 +33,16 @@ namespace CloudDriveLayer
             String mycontent = request.GetStringAsync(command).Result;
             return JsonConvert.DeserializeObject<T>(mycontent);
         }
+        public static T nodeChange<T>(ConfigOperations.ConfigData config, String command, HttpContent body)
+        {
+            HttpClient request = new HttpClient();
+            request.BaseAddress = new Uri(config.metaData.metadataUrl);
+            request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
+            body.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+            var mycontent = request.PutAsync(command, body).Result;
+            var result = mycontent.Content.ReadAsStringAsync().Result;
+            return JsonConvert.DeserializeObject<T>(result);
+        }
 
         public static CloudDriveListResponse<CloudDriveFolder> getFolders(ConfigOperations.ConfigData config, String id)
         {
@@ -58,7 +68,7 @@ namespace CloudDriveLayer
         }
         public static CloudDriveListResponse<CloudDriveFile> getFilesByName(ConfigOperations.ConfigData config, String name)
         {
-            return listSearch<CloudDriveFile>(config, "nodes?filters=kind:FILE AND name:'" + name);
+            return listSearch<CloudDriveFile>(config, "nodes?filters=kind:FILE AND name:'" + name + "'");
         }
         public static CloudDriveListResponse<CloudDriveFile> getFileByNameAndMd5(ConfigOperations.ConfigData config, String name, String md5)
         {
@@ -138,9 +148,9 @@ namespace CloudDriveLayer
         }
 
 
-        public static void addNodeParent(ConfigOperations.ConfigData config, string p1, string p2)
+        public static void addNodeParent(ConfigOperations.ConfigData config, string nodeId, string parentId)
         {
-            throw new NotImplementedException();
+            nodeChange<CloudDriveFolder>(config, "nodes/" + parentId + "/children/" + nodeId, new StringContent(""));
         }
 
         public static void uploadFileContent(ConfigOperations.ConfigData config, string localFilename, string p)

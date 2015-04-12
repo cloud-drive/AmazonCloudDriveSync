@@ -56,35 +56,38 @@ namespace AmazonCloudDriveSync
         {
             //rule #1 - avoid uploading if we can.  matching md5s mean the file is already in cloud
             CloudDriveListResponse<CloudDriveFile> fileSearch = CloudDriveOperations.getFilesByName(config, Path.GetFileName(localFilename));
-            switch (fileSearch.count)
+            List<CloudDriveFile> fileSearchCleaned = new List<CloudDriveFile>();
+            if (fileSearch.count > 0)
+                fileSearchCleaned = fileSearch.data.Where(x => x.name == Path.GetFileName(localFilename)).ToList<CloudDriveFile>();
+            switch (fileSearchCleaned.Count)
             {
                 case (0):
                     CloudDriveOperations.uploadFile(config, localFilename, cloudParent.cloudId, true);
                     //create the file
                     break;
                 case (1):
-                    bool md5Match = (fileSearch.data[0].contentProperties.md5 == getMD5hash(localFilename));
-                    bool parentMatch = fileSearch.data[0].parents.Contains(cloudParent.cloudId);
+                    bool md5Match = (fileSearchCleaned[0].contentProperties.md5 == getMD5hash(localFilename));
+                    bool parentMatch = fileSearchCleaned[0].parents.Contains(cloudParent.cloudId);
 
                     if (md5Match && !parentMatch)
                         //if md5 matches & parent doesnt match, add parent
-                        CloudDriveOperations.addNodeParent(config, fileSearch.data[0].id, cloudParent.cloudId);
+                        CloudDriveOperations.addNodeParent(config, fileSearchCleaned[0].id, cloudParent.cloudId);
                     else if (!md5Match && !parentMatch)
                         //this other file is same name but unrelated, upload force
                         // if possible to *copy* the existing cloud node to an additional name, that would be preferable
                         CloudDriveOperations.uploadFile(config, localFilename, cloudParent.cloudId, true);
                     else if (!md5Match && parentMatch)
                         //file has changed, need to update content
-                        CloudDriveOperations.uploadFileContent(config, localFilename, fileSearch.data[0].id);
+                        CloudDriveOperations.uploadFileContent(config, localFilename, fileSearchCleaned[0].id);
                     break;
                 default:
                     string localMd5 = getMD5hash(localFilename);
                     //multiple files have the same filename.  look for an Md5 match.
-                    var matchingMd5 = fileSearch.data.Where(x => x.contentProperties.md5 == localMd5).FirstOrDefault();
+                    var matchingMd5 = fileSearchCleaned.Where(x => x.contentProperties.md5 == localMd5).FirstOrDefault();
                     if (matchingMd5==null)
                         CloudDriveOperations.uploadFile(config, localFilename, cloudParent.cloudId, true);
-                    else
-                        CloudDriveOperations.addNodeParent(config, matchingMd5.id, cloudParent.cloudId);
+                    else if (!matchingMd5.parents.Contains(cloudParent.cloudId))
+                            CloudDriveOperations.addNodeParent(config, matchingMd5.id, cloudParent.cloudId);
                     break;
             }
         }
