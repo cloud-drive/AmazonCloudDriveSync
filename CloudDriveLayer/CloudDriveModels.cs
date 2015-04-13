@@ -23,6 +23,24 @@ namespace CloudDriveLayer.CloudDriveModels
                 properties = new List<KeyValuePair<string, string>>();
             }
         }
+        public class Video
+        {
+            String audioCodec;
+            float rotate;
+            int width;
+            int audioChannels;
+            float videoFrameRate;
+            long videoBitRate;
+            float duration;
+            int height;
+            long bitrate;
+            int audioSampleRate;
+            string videoCodec;
+            string audioChannelLayout;
+            int audioBitrate;
+            string encoder;
+
+        }
         public class ContentProperties
         {
             public UInt64 size;
@@ -30,6 +48,12 @@ namespace CloudDriveLayer.CloudDriveModels
             public String contentType;
             public string extension;
             public string md5;
+            public Video video;
+
+            public ContentProperties()
+            {
+                video = new Video();
+            }
         }
         public class CloudDriveNode : CloudDriveNodeRequest
         {

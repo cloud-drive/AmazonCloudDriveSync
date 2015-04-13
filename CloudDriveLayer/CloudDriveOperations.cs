@@ -1,5 +1,4 @@
 ﻿using CloudDriveLayer.CloudDriveModels;
-using JPT;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -17,10 +16,34 @@ namespace CloudDriveLayer
 {
     public static class CloudDriveOperations
     {
+        public class RetryHandler : DelegatingHandler
+        {
+            private const int MaxRetries = 3;
+            public RetryHandler(HttpMessageHandler innerHandler)
+                : base(innerHandler)
+            { }
+            protected override async Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken)
+            {
+                HttpResponseMessage response = new HttpResponseMessage();
+                for (int i = 0; i < MaxRetries; i++)
+                {
+                    response = await base.SendAsync(request, cancellationToken);
+                    if (response.IsSuccessStatusCode)
+                        return response;
+                    else
+                        Console.WriteLine("needing to retry");
+                }
+                return response;
+            }
+        }
         public static CloudDriveListResponse<T> listSearch<T>(ConfigOperations.ConfigData config, String command)
         {
             HttpClient request = createAuthenticatedClient(config, config.metaData.metadataUrl);
-            String mycontent = request.GetStringAsync(command).Result;
+
+                String mycontent = request.GetStringAsync(command).Result;
+
             return JsonConvert.DeserializeObject<CloudDriveListResponse<T>>(mycontent);
         }
         public static T nodeSearch<T>(ConfigOperations.ConfigData config, String command)
@@ -39,7 +62,7 @@ namespace CloudDriveLayer
         }
         public static HttpClient createAuthenticatedClient(ConfigOperations.ConfigData config, String url)
         {
-            HttpClient request = new HttpClient();
+            HttpClient request = new HttpClient(new RetryHandler(new HttpClientHandler()));
             request.BaseAddress = new Uri(url);
             request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
             return request;
@@ -57,7 +80,10 @@ namespace CloudDriveLayer
         {
             return listSearch<CloudDriveFolder>(config, "nodes?filters=kind:FOLDER AND name:" + name);
         }
-
+        public static CloudDriveListResponse<CloudDriveFolder> getRootFolder(ConfigOperations.ConfigData config, String name)
+        {
+            return listSearch<CloudDriveFolder>(config, "nodes?filters=kind:FOLDER AND isRoot:true");
+        }
         public static CloudDriveFolder getFolder(ConfigOperations.ConfigData config, String id)
         {
             return nodeSearch<CloudDriveFolder>(config, "nodes/" + id);
@@ -95,19 +121,20 @@ namespace CloudDriveLayer
                 form.Add(new StringContent(myMetaData), "metadata");
 
                 Download myDownload = new Download();
-                var fileStreamContent = new ProgressableStreamContent(file, 8096, myDownload);
+                //var fileStreamContent = new ProgressableStreamContent(, 8096, myDownload);
+                var fileStreamContent = new StreamContent(file);
                 fileStreamContent.Headers.ContentType = new MediaTypeHeaderValue(MimeTypeMap.MimeTypeMap.GetMimeType(Path.GetExtension(fullFilePath)));
                 form.Add(fileStreamContent, "content", Path.GetFileName(fullFilePath));
 
                 HttpClient request = createAuthenticatedClient(config, config.metaData.contentUrl);
+                request.Timeout = new TimeSpan(3,0,0);
                 var postAsync = request.PostAsync("nodes" + (force ? "?suppress=deduplication":""), form);
-                TextProgressBar myBar = new TextProgressBar(file.Length,(-1),true);
                 while (!postAsync.IsCompleted)
                 {
-                    myBar.Update(myDownload.Uploaded);
-                    Thread.Sleep(1000);
+                    if (file.CanRead) Console.WriteLine("{0}: {1:P2} uploaded ({2}/{3})", Path.GetFileName(fullFilePath),(double)file.Position/(double)file.Length, file.Position, file.Length);
+                    Thread.Sleep(5000);
                 }
-                myBar.Update(myDownload.Uploaded);
+                Console.WriteLine("{0}: uploaded", Path.GetFileName(fullFilePath));
 
                 HttpResponseMessage result = postAsync.Result;
                 if (result.StatusCode == HttpStatusCode.Conflict)

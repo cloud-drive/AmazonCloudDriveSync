@@ -63,7 +63,7 @@ namespace CloudDriveLayer
                         {
                             stream.Write(buffer, 0, length);
                         }
-                        catch
+                        catch (Exception e)
                         {
                             downloader.ChangeState(DownloadState.Cancelled);
                             break;

@@ -25,23 +25,25 @@ namespace AmazonCloudDriveSync
     class Program
     {
         public static ConfigData config;
+        public static SemaphoreSlim threadLock;
+
         static void Main(string[] args)
         {
-            Console.WriteLine("Press a key to begin");  Console.ReadKey();
+            Console.WriteLine("Press a key to begin"); Console.ReadKey();
             createConfig();
+            threadLock = new SemaphoreSlim(3);
             if (File.Exists(ConfigurationManager.AppSettings["jsonConfig"]))
                 config = JsonConvert.DeserializeObject<ConfigData>(File.ReadAllText(ConfigurationManager.AppSettings["jsonConfig"]));
             config.updateConfig(() => { File.WriteAllText(ConfigurationManager.AppSettings["jsonConfig"], JsonConvert.SerializeObject(config)); });
-            
+
             Console.WriteLine("We've got a good access token, let's go.");
             Folder rootFolder = new Folder() {cloudId=config.cloudMainFolderId, localDirectory=new DirectoryInfo(ConfigurationManager.AppSettings["localFolder"])};
             WalkDirectoryTree(rootFolder, 
                 (filename, parentFolder) => { 
-                    Console.WriteLine("{0} in {1}:{2}", filename, parentFolder.cloudId, parentFolder.localDirectory.FullName); 
-                    Thread t = new Thread(() => {updateSingleFile(filename, parentFolder);});
-                    t.Start();
+                    Console.WriteLine("{0} in {1}:{2}", filename, parentFolder.cloudId, parentFolder.localDirectory.FullName);
+                    updateSingleFile(filename, parentFolder);
                 }, 
-                (folderName) => { 
+                (folderName) => {
                     Console.WriteLine(folderName.localDirectory.FullName); 
                 });
             Console.WriteLine("All done!");
@@ -51,6 +53,7 @@ namespace AmazonCloudDriveSync
         private static void updateSingleFile(String localFilename, Folder cloudParent)
         {
             //rule #1 - avoid uploading if we can.  matching md5s mean the file is already in cloud
+            config.updateConfig(() => { File.WriteAllText(ConfigurationManager.AppSettings["jsonConfig"], JsonConvert.SerializeObject(config)); });
             CloudDriveListResponse<CloudDriveFile> fileSearch = CloudDriveOperations.getFilesByName(config, Path.GetFileName(localFilename));
             List<CloudDriveFile> fileSearchCleaned = new List<CloudDriveFile>();
             if (fileSearch.count > 0)
@@ -107,7 +110,14 @@ namespace AmazonCloudDriveSync
 
             if (files != null)
                 foreach (System.IO.FileInfo fi in files)
-                    fileOperation(fi.FullName, root);
+                {
+                    threadLock.Wait();
+                    ThreadPool.QueueUserWorkItem(o =>
+                        {
+                            fileOperation(fi.FullName, root);
+                            threadLock.Release();
+                        });
+                }
 
             subDirs = root.localDirectory.GetDirectories();
             foreach (System.IO.DirectoryInfo dirInfo in subDirs)

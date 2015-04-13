@@ -25,14 +25,14 @@ namespace CloudDriveLayer.ConfigOperations
         public DateTime lastMetaDataCheck { get; set; }
         public String _appKey;
         public String _appSecret;
-        public String _cloudRootFolderId;
+        public String _cloudMainFolderName;
         public String _oauthxRedirect;
         public String _oauthxBase;
         public ConfigData(String appKey, String appSecret, String cloudRoot, String oauthXRedirect, String oauthXBase)
         {
             _appKey = appKey;
             _appSecret = appSecret;
-            _cloudRootFolderId = cloudRoot;
+            _cloudMainFolderName = cloudRoot;
             _oauthxRedirect = oauthXRedirect;
             _oauthxBase = oauthXBase;
             lastToken = new AuthTokenResponse();
@@ -47,19 +47,19 @@ namespace CloudDriveLayer.ConfigOperations
                     refreshAccessToken(this.lastToken.refresh_token, _appKey, _appSecret);
             if (String.IsNullOrWhiteSpace(this.lastToken.access_token) && (this.lastTokenReceived.AddSeconds(this.lastToken.expires_in) < DateTime.Now))
                 getBrandNewToken();
-            saveConfig();
 
-            if (this.lastMetaDataCheck.AddDays(3) < DateTime.Now)
+            if (lastMetaDataCheck.AddDays(3) < DateTime.Now)
                 getMetaDataUrl();
             getRootFolderId();
 
-            if (String.IsNullOrWhiteSpace(this.cloudMainFolderId) || this.cloudMainFolderId == this.rootFolderId)
+            if (String.IsNullOrWhiteSpace(cloudMainFolderId) || cloudMainFolderId == rootFolderId)
             {
-                var possibleMainFolders = CloudDriveOperations.getFoldersByName(this, _cloudRootFolderId);
-                if (possibleMainFolders.count > 1) throw new NotImplementedException();
+                if (String.IsNullOrWhiteSpace(rootFolderId))
+                    rootFolderId = CloudDriveOperations.getRootFolder(this, _cloudMainFolderName).data[0].id;
+                var possibleMainFolders = CloudDriveOperations.getChildFolderByName(this, rootFolderId, _cloudMainFolderName);
                 if (possibleMainFolders.count == 0)
                 {
-                    this.cloudMainFolderId = CloudDriveOperations.createFolder(this, _cloudRootFolderId, this.rootFolderId);
+                    this.cloudMainFolderId = CloudDriveOperations.createFolder(this, _cloudMainFolderName, rootFolderId);
 
                 }
                 else if (possibleMainFolders.count == 1)

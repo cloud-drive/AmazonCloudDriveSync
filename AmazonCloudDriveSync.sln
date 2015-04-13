@@ -4,6 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AmazonCloudDriveSync", "AmazonCloudDriveSync\AmazonCloudDriveSync.csproj", "{5EE8EF82-7815-44FB-9FB7-F5856E72F16A}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D7624797-0D1D-4C9E-B6BB-1A56A4311608} = {D7624797-0D1D-4C9E-B6BB-1A56A4311608}
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{DB10D3B7-899B-452B-9568-103D1FE0019A}"
 	ProjectSection(SolutionItems) = preProject
