@@ -28,13 +28,7 @@ namespace AmazonCloudDriveSync
         static void Main(string[] args)
         {
             Console.WriteLine("Press a key to begin");  Console.ReadKey();
-            config = new ConfigData(
-                ConfigurationManager.AppSettings["appKey"], 
-                ConfigurationManager.AppSettings["appSecret"], 
-                ConfigurationManager.AppSettings["cloudFolder"],
-                ConfigurationManager.AppSettings["oauthxRedirect"],
-                ConfigurationManager.AppSettings["oauthxBase"]
-                );
+            createConfig();
             if (File.Exists(ConfigurationManager.AppSettings["jsonConfig"]))
                 config = JsonConvert.DeserializeObject<ConfigData>(File.ReadAllText(ConfigurationManager.AppSettings["jsonConfig"]));
             config.updateConfig(() => { File.WriteAllText(ConfigurationManager.AppSettings["jsonConfig"], JsonConvert.SerializeObject(config)); });
@@ -44,14 +38,16 @@ namespace AmazonCloudDriveSync
             WalkDirectoryTree(rootFolder, 
                 (filename, parentFolder) => { 
                     Console.WriteLine("{0} in {1}:{2}", filename, parentFolder.cloudId, parentFolder.localDirectory.FullName); 
-                    updateSingleFile(filename, parentFolder); 
+                    Thread t = new Thread(() => {updateSingleFile(filename, parentFolder);});
+                    t.Start();
                 }, 
                 (folderName) => { 
                     Console.WriteLine(folderName.localDirectory.FullName); 
                 });
-
+            Console.WriteLine("All done!");
             Console.ReadKey();
         }
+
         private static void updateSingleFile(String localFilename, Folder cloudParent)
         {
             //rule #1 - avoid uploading if we can.  matching md5s mean the file is already in cloud
@@ -118,7 +114,6 @@ namespace AmazonCloudDriveSync
                 WalkDirectoryTree(new Folder() { cloudId = getOrCreateCloudSubFolderId(root.cloudId, dirInfo.Name), localDirectory = dirInfo}, fileOperation, folderOperation);
 
         }
-
         private static string getOrCreateCloudSubFolderId(string parentId, string childName)
         {
             var folderSearch = CloudDriveOperations.getChildFolderByName(config, parentId, childName).data;
@@ -145,6 +140,16 @@ namespace AmazonCloudDriveSync
         {
            public String cloudId;
            public DirectoryInfo localDirectory;
+        }
+        private static void createConfig()
+        {
+            config = new ConfigData(
+            ConfigurationManager.AppSettings["appKey"],
+            ConfigurationManager.AppSettings["appSecret"],
+            ConfigurationManager.AppSettings["cloudFolder"],
+            ConfigurationManager.AppSettings["oauthxRedirect"],
+            ConfigurationManager.AppSettings["oauthxBase"]
+            );
         }
     }
 

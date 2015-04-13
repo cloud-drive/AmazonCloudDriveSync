@@ -19,31 +19,31 @@ namespace CloudDriveLayer
     {
         public static CloudDriveListResponse<T> listSearch<T>(ConfigOperations.ConfigData config, String command)
         {
-            HttpClient request = new HttpClient();
-            request.BaseAddress = new Uri(config.metaData.metadataUrl);
-            request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
+            HttpClient request = createAuthenticatedClient(config, config.metaData.metadataUrl);
             String mycontent = request.GetStringAsync(command).Result;
             return JsonConvert.DeserializeObject<CloudDriveListResponse<T>>(mycontent);
         }
         public static T nodeSearch<T>(ConfigOperations.ConfigData config, String command)
         {
-            HttpClient request = new HttpClient();
-            request.BaseAddress = new Uri(config.metaData.metadataUrl);
-            request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
+            HttpClient request = createAuthenticatedClient(config, config.metaData.metadataUrl);
             String mycontent = request.GetStringAsync(command).Result;
             return JsonConvert.DeserializeObject<T>(mycontent);
         }
         public static T nodeChange<T>(ConfigOperations.ConfigData config, String command, HttpContent body)
         {
-            HttpClient request = new HttpClient();
-            request.BaseAddress = new Uri(config.metaData.metadataUrl);
-            request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
+            HttpClient request = createAuthenticatedClient(config, config.metaData.metadataUrl);
             body.Headers.ContentType = new MediaTypeHeaderValue("application/json");
             var mycontent = request.PutAsync(command, body).Result;
             var result = mycontent.Content.ReadAsStringAsync().Result;
             return JsonConvert.DeserializeObject<T>(result);
         }
-
+        public static HttpClient createAuthenticatedClient(ConfigOperations.ConfigData config, String url)
+        {
+            HttpClient request = new HttpClient();
+            request.BaseAddress = new Uri(url);
+            request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
+            return request;
+        }
         public static CloudDriveListResponse<CloudDriveFolder> getFolders(ConfigOperations.ConfigData config, String id)
         {
             return listSearch<CloudDriveFolder>(config, id.Length > 0 ? "nodes/" + id + "/children?filters=kind:FOLDER" : "nodes?filters=kind:FOLDER");
@@ -83,9 +83,6 @@ namespace CloudDriveLayer
         {   return uploadFile(config, fullFilePath, parentId, false); }
         public static String uploadFile(ConfigOperations.ConfigData config, string fullFilePath, string parentId, Boolean force)
         {
-            HttpClient request = new HttpClient();
-            request.BaseAddress = new Uri(config.metaData.contentUrl);
-            request.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.lastToken.access_token);
 
             var parentList = new List<String>();
             parentList.Add(parentId);
@@ -102,7 +99,8 @@ namespace CloudDriveLayer
                 fileStreamContent.Headers.ContentType = new MediaTypeHeaderValue(MimeTypeMap.MimeTypeMap.GetMimeType(Path.GetExtension(fullFilePath)));
                 form.Add(fileStreamContent, "content", Path.GetFileName(fullFilePath));
 
-                var postAsync = request.PostAsync("nodes", form);
+                HttpClient request = createAuthenticatedClient(config, config.metaData.contentUrl);
+                var postAsync = request.PostAsync("nodes" + (force ? "?suppress=deduplication":""), form);
                 TextProgressBar myBar = new TextProgressBar(file.Length,(-1),true);
                 while (!postAsync.IsCompleted)
                 {
