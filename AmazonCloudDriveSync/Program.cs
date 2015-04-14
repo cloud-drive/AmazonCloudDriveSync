@@ -26,12 +26,14 @@ namespace AmazonCloudDriveSync
     {
         public static ConfigData config;
         public static SemaphoreSlim threadLock;
+        public static SemaphoreSlim configLock;
 
         static void Main(string[] args)
         {
             Console.WriteLine("Press a key to begin"); Console.ReadKey();
             createConfig();
             threadLock = new SemaphoreSlim(3);
+            configLock = new SemaphoreSlim(1);
             if (File.Exists(ConfigurationManager.AppSettings["jsonConfig"]))
                 config = JsonConvert.DeserializeObject<ConfigData>(File.ReadAllText(ConfigurationManager.AppSettings["jsonConfig"]));
             config.updateConfig(() => { File.WriteAllText(ConfigurationManager.AppSettings["jsonConfig"], JsonConvert.SerializeObject(config)); });
@@ -53,7 +55,7 @@ namespace AmazonCloudDriveSync
         private static void updateSingleFile(String localFilename, Folder cloudParent)
         {
             //rule #1 - avoid uploading if we can.  matching md5s mean the file is already in cloud
-            config.updateConfig(() => { File.WriteAllText(ConfigurationManager.AppSettings["jsonConfig"], JsonConvert.SerializeObject(config)); });
+            config.updateTokens(() => { configLock.Wait(); File.WriteAllText(ConfigurationManager.AppSettings["jsonConfig"], JsonConvert.SerializeObject(config)); configLock.Release(); });
             CloudDriveListResponse<CloudDriveFile> fileSearch = CloudDriveOperations.getFilesByName(config, Path.GetFileName(localFilename));
             List<CloudDriveFile> fileSearchCleaned = new List<CloudDriveFile>();
             if (fileSearch.count > 0)
