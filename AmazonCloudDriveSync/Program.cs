@@ -27,15 +27,26 @@ namespace AmazonCloudDriveSync
         public static ConfigData config;
         public static SemaphoreSlim threadLock;
         public static SemaphoreSlim configLock;
+        private static bool cancel = false;
 
         static void Main(string[] args)
         {
-            Console.WriteLine("Press a key to begin"); Console.ReadKey();
-            createConfig();
-            threadLock = new SemaphoreSlim(3);
+           // Console.WriteLine("Press a key to begin"); Console.ReadKey();
+            config = new ConfigData();
+            threadLock = new SemaphoreSlim(5);
             configLock = new SemaphoreSlim(1);
+            
+            var autoResetEvent = new AutoResetEvent(false);
+            Console.CancelKeyPress += (sender, eventArgs) =>
+            {
+                cancel = true;
+                eventArgs.Cancel = true;
+                Console.WriteLine("**** Will end once current threads complete ****");
+            };
+
             if (File.Exists(ConfigurationManager.AppSettings["jsonConfig"]))
                 config = JsonConvert.DeserializeObject<ConfigData>(File.ReadAllText(ConfigurationManager.AppSettings["jsonConfig"]));
+            updateConfig();
             config.updateConfig(() => { File.WriteAllText(ConfigurationManager.AppSettings["jsonConfig"], JsonConvert.SerializeObject(config)); });
 
             Console.WriteLine("We've got a good access token, let's go.");
@@ -48,6 +59,7 @@ namespace AmazonCloudDriveSync
                 (folderName) => {
                     Console.WriteLine(folderName.localDirectory.FullName); 
                 });
+
             Console.WriteLine("All done!");
             Console.ReadKey();
         }
@@ -94,6 +106,7 @@ namespace AmazonCloudDriveSync
         }
         private static void WalkDirectoryTree(Folder root, Action<String, Folder> fileOperation, Action<Folder> folderOperation)
         {
+            if (cancel) return;
             folderOperation(root);
             System.IO.FileInfo[] files = null;
             System.IO.DirectoryInfo[] subDirs = null;
@@ -114,6 +127,7 @@ namespace AmazonCloudDriveSync
                 foreach (System.IO.FileInfo fi in files)
                 {
                     threadLock.Wait();
+                    if (cancel) return;
                     ThreadPool.QueueUserWorkItem(o =>
                         {
                             fileOperation(fi.FullName, root);
@@ -153,15 +167,15 @@ namespace AmazonCloudDriveSync
            public String cloudId;
            public DirectoryInfo localDirectory;
         }
-        private static void createConfig()
+        private static void updateConfig()
         {
-            config = new ConfigData(
-            ConfigurationManager.AppSettings["appKey"],
-            ConfigurationManager.AppSettings["appSecret"],
-            ConfigurationManager.AppSettings["cloudFolder"],
-            ConfigurationManager.AppSettings["oauthxRedirect"],
-            ConfigurationManager.AppSettings["oauthxBase"]
-            );
+            config.updateValues(
+                ConfigurationManager.AppSettings["appKey"],
+                ConfigurationManager.AppSettings["appSecret"],
+                ConfigurationManager.AppSettings["cloudFolder"],
+                ConfigurationManager.AppSettings["oauthxRedirect"],
+                ConfigurationManager.AppSettings["oauthxBase"]
+                );
         }
     }
 
